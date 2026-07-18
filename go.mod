@@ -1,3 +1,3 @@
-module github.com/moveeeax/reqtrace
+module github.com/cybercapybara/reqtrace
 
 go 1.17

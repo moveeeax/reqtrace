@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/moveeeax/reqtrace/internal/trace"
+	"github.com/cybercapybara/reqtrace/internal/trace"
 )
 
 // writeJSON renders the report as indented JSON.

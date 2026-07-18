@@ -1,11 +1,9 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"net/http/httptrace"
 	"os"
 	"strings"
@@ -116,7 +114,11 @@ func probe(rawURL string, opt options) (trace.Report, error) {
 	ctx := httptrace.WithClientTrace(req.Context(), trace.NewClientTrace(rec))
 	req = req.WithContext(ctx)
 
-	client := buildClient(opt)
+	client := httpx.NewClient(httpx.ClientOptions{
+		Timeout:        opt.timeout,
+		Insecure:       opt.insecure,
+		FollowRedirect: opt.follow,
+	})
 
 	rec.Mark(trace.EventStart)
 	resp, err := client.Do(req)
@@ -139,22 +141,4 @@ func probe(rawURL string, opt options) (trace.Report, error) {
 		ContentLength: n,
 		Result:        trace.Summarize(rec),
 	}, nil
-}
-
-// buildClient assembles an *http.Client honouring the timeout, TLS, and
-// redirect options.
-func buildClient(opt options) *http.Client {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: opt.insecure},
-	}
-	client := &http.Client{
-		Timeout:   opt.timeout,
-		Transport: transport,
-	}
-	if !opt.follow {
-		client.CheckRedirect = func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	}
-	return client
 }

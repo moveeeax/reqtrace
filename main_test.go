@@ -156,6 +156,34 @@ func TestRunRedirectFollowed(t *testing.T) {
 	}
 }
 
+func TestRunFollowReportsFinalURL(t *testing.T) {
+	ts := redirectServer(t)
+	defer ts.Close()
+
+	_, out, _ := exec("-json", "-follow", ts.URL+"/redirect")
+	var got struct {
+		URL string `json:"url"`
+	}
+	json.Unmarshal([]byte(out), &got)
+	if !strings.HasSuffix(got.URL, "/dest") {
+		t.Errorf("url = %q, want final destination ending in /dest", got.URL)
+	}
+}
+
+func TestRunNoFollowReportsRequestedURL(t *testing.T) {
+	ts := redirectServer(t)
+	defer ts.Close()
+
+	_, out, _ := exec("-json", ts.URL+"/redirect")
+	var got struct {
+		URL string `json:"url"`
+	}
+	json.Unmarshal([]byte(out), &got)
+	if !strings.HasSuffix(got.URL, "/redirect") {
+		t.Errorf("url = %q, want requested URL ending in /redirect", got.URL)
+	}
+}
+
 func TestRunSendsBody(t *testing.T) {
 	var gotBody string
 	var gotMethod string

@@ -133,8 +133,15 @@ func probe(rawURL string, opt options) (trace.Report, error) {
 	}
 	rec.Mark(trace.EventDone)
 
+	// resp.Request reflects the final request after any redirects were
+	// followed, so report the URL that actually served the response.
+	finalURL := rawURL
+	if resp.Request != nil && resp.Request.URL != nil {
+		finalURL = resp.Request.URL.String()
+	}
+
 	return trace.Report{
-		URL:           rawURL,
+		URL:           finalURL,
 		Method:        req.Method,
 		Status:        resp.StatusCode,
 		Proto:         resp.Proto,

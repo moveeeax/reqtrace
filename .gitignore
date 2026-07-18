@@ -1,0 +1,14 @@
+# Compiled binary
+/reqtrace
+reqtrace
+
+# Test / build artifacts
+*.exe
+*.out
+*.test
+coverage.out
+
+# Editor / OS cruft
+.idea/
+.vscode/
+.DS_Store

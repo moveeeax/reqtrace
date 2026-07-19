@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cybercapybara/reqtrace/internal/httpx"
-	"github.com/cybercapybara/reqtrace/internal/trace"
+	"github.com/moveeeax/reqtrace/internal/httpx"
+	"github.com/moveeeax/reqtrace/internal/trace"
 )
 
 // headerList collects repeated -H flags.

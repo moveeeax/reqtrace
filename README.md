@@ -7,13 +7,13 @@ and body download — using Go's `net/http/httptrace`.
 ## Install
 
 ```sh
-go install github.com/cybercapybara/reqtrace@latest
+go install github.com/moveeeax/reqtrace@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/cybercapybara/reqtrace
+git clone https://github.com/moveeeax/reqtrace
 cd reqtrace
 go build -o reqtrace .
 ```

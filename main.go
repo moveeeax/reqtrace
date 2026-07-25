@@ -47,7 +47,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	var opt options
 	fs.StringVar(&opt.method, "method", "GET", "HTTP method to use")
 	fs.Var(&opt.headers, "H", "request header 'Key: Value' (repeatable)")
-	fs.DurationVar(&opt.timeout, "timeout", 30*time.Second, "overall request timeout")
+	fs.DurationVar(&opt.timeout, "timeout", 30*time.Second, "overall request timeout (0 disables it)")
 	fs.BoolVar(&opt.jsonOut, "json", false, "emit machine-readable JSON")
 	fs.BoolVar(&opt.insecure, "insecure", false, "skip TLS certificate verification")
 	fs.BoolVar(&opt.follow, "follow", false, "follow HTTP redirects")
@@ -67,6 +67,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "reqtrace: exactly one URL argument is required")
 		fs.Usage()
 		return 2
+	}
+
+	// http.Client treats any non-positive Timeout as "wait forever", so a
+	// negative duration would silently disable the very bound the user asked
+	// for. Only an explicit zero may mean that.
+	if opt.timeout < 0 {
+		fmt.Fprintf(stderr, "reqtrace: -timeout must not be negative (got %s); use 0 to disable the timeout\n", opt.timeout)
+		return 2
+	}
+	if opt.timeout == 0 {
+		fmt.Fprintln(stderr, "reqtrace: warning: -timeout 0 disables the request timeout; a slow or endless response will hang this process")
+	}
+	if opt.insecure {
+		fmt.Fprintln(stderr, "reqtrace: warning: -insecure disables TLS certificate verification; the server is NOT authenticated and the connection can be intercepted")
 	}
 
 	report, err := probe(fs.Arg(0), opt)
@@ -135,9 +149,13 @@ func probe(rawURL string, opt options) (trace.Report, error) {
 
 	// resp.Request reflects the final request after any redirects were
 	// followed, so report the URL that actually served the response.
-	finalURL := rawURL
+	//
+	// Redacted, never String: a URL of the form https://user:secret@host puts
+	// the password in every line of output, and reqtrace output habitually ends
+	// up pasted into tickets and captured in CI logs.
+	finalURL := req.URL.Redacted()
 	if resp.Request != nil && resp.Request.URL != nil {
-		finalURL = resp.Request.URL.String()
+		finalURL = resp.Request.URL.Redacted()
 	}
 
 	return trace.Report{

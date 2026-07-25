@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,17 +46,33 @@ func BuildRequest(spec RequestSpec) (*http.Request, error) {
 		}
 	}
 
+	// net/http writes Request.Host and excludes any "Host" entry in the header
+	// map, so a user-supplied -H "Host: ..." would otherwise be dropped without
+	// a word. Honour it the way curl --header does.
+	if host := spec.Headers.Get("Host"); host != "" {
+		req.Host = host
+	}
+
 	return req, nil
 }
 
 // validateURL rejects inputs that are not absolute http(s) URLs.
+//
+// Error messages never echo the raw input: a URL may carry userinfo
+// credentials, and these messages routinely land in CI logs.
 func validateURL(raw string) error {
 	if raw == "" {
 		return fmt.Errorf("empty URL")
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+		// *url.Error stringifies with the raw input embedded, so unwrap it and
+		// report only the reason.
+		var perr *url.Error
+		if errors.As(err, &perr) {
+			return fmt.Errorf("invalid URL: %v", perr.Err)
+		}
+		return fmt.Errorf("invalid URL: %v", err)
 	}
 	switch u.Scheme {
 	case "http", "https":
@@ -63,7 +80,9 @@ func validateURL(raw string) error {
 		return fmt.Errorf("unsupported URL scheme %q: want http or https", u.Scheme)
 	}
 	if u.Host == "" {
-		return fmt.Errorf("invalid URL %q: missing host", raw)
+		// Redacted keeps any userinfo password out of the message, which may
+		// well end up in a CI log.
+		return fmt.Errorf("invalid URL %q: missing host", u.Redacted())
 	}
 	return nil
 }

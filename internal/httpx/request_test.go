@@ -1,8 +1,9 @@
 package httpx
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -53,7 +54,7 @@ func TestBuildRequestBody(t *testing.T) {
 	if req.Body == nil {
 		t.Fatal("expected non-nil body")
 	}
-	data, _ := ioutil.ReadAll(req.Body)
+	data, _ := io.ReadAll(req.Body)
 	if string(data) != "payload" {
 		t.Errorf("body = %q", data)
 	}
@@ -69,6 +70,50 @@ func TestBuildRequestNoBody(t *testing.T) {
 	}
 	if req.Body != nil {
 		t.Errorf("expected nil body, got %v", req.Body)
+	}
+}
+
+func TestBuildRequestHonoursHostHeader(t *testing.T) {
+	headers, _ := ParseHeaders([]string{"Host: virtual.example"})
+	req, err := BuildRequest(RequestSpec{URL: "http://192.0.2.10/", Headers: headers})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// net/http writes Request.Host and ignores any Host entry in the header
+	// map, so this must land on the field or it is silently dropped.
+	if req.Host != "virtual.example" {
+		t.Errorf("req.Host = %q, want virtual.example", req.Host)
+	}
+	if req.URL.Host != "192.0.2.10" {
+		t.Errorf("URL host = %q, want the dialled address to be unchanged", req.URL.Host)
+	}
+}
+
+func TestBuildRequestWithoutHostHeaderUsesURL(t *testing.T) {
+	req, err := BuildRequest(RequestSpec{URL: "http://example.com/"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if req.Host != "example.com" {
+		t.Errorf("req.Host = %q, want the URL host when no Host header is given", req.Host)
+	}
+}
+
+func TestValidateURLErrorsDoNotEchoCredentials(t *testing.T) {
+	cases := []string{
+		"http://user:hunter2@\x7f/",
+		"http:// user:hunter2@example.com/",
+		"http://user:hunter2@",
+	}
+	for _, raw := range cases {
+		_, err := BuildRequest(RequestSpec{URL: raw})
+		if err == nil {
+			t.Errorf("expected an error for %q", raw)
+			continue
+		}
+		if strings.Contains(err.Error(), "hunter2") {
+			t.Errorf("error message leaked the URL password: %v", err)
+		}
 	}
 }
 

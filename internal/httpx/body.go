@@ -2,7 +2,7 @@ package httpx
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 )
 
@@ -23,7 +23,7 @@ func ParseBody(spec string) ([]byte, bool, error) {
 		if path == "" {
 			return nil, false, fmt.Errorf("empty file path after '@'")
 		}
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, false, fmt.Errorf("read body file: %w", err)
 		}

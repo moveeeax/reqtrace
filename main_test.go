@@ -248,6 +248,124 @@ func TestRunTimeout(t *testing.T) {
 	}
 }
 
+// TestRunRedactsURLPassword guards the headline privacy property: reqtrace
+// output is routinely pasted into tickets and captured in CI logs, so a
+// userinfo password must never appear in it.
+func TestRunRedactsURLPassword(t *testing.T) {
+	var gotAuth string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+	}))
+	defer ts.Close()
+
+	withCreds := strings.Replace(ts.URL, "http://", "http://alice:hunter2@", 1)
+
+	for _, args := range [][]string{{withCreds}, {"-json", withCreds}} {
+		code, out, errOut := exec(args...)
+		if code != 0 {
+			t.Fatalf("exit = %d, stderr=%q", code, errOut)
+		}
+		if strings.Contains(out, "hunter2") || strings.Contains(errOut, "hunter2") {
+			t.Errorf("args %v leaked the password:\nstdout=%s\nstderr=%s", args, out, errOut)
+		}
+		if !strings.Contains(out, "alice") {
+			t.Errorf("args %v dropped the username; only the password should be masked:\n%s", args, out)
+		}
+	}
+	// The credentials must still be sent, only hidden from the report.
+	if gotAuth == "" {
+		t.Error("expected basic auth to be sent to the server")
+	}
+}
+
+func TestRunRedactsPasswordOnRedirect(t *testing.T) {
+	ts := redirectServer(t)
+	defer ts.Close()
+
+	withCreds := strings.Replace(ts.URL, "http://", "http://alice:hunter2@", 1) + "/redirect"
+	code, out, errOut := exec("-json", "-follow", withCreds)
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr=%q", code, errOut)
+	}
+	if strings.Contains(out, "hunter2") {
+		t.Errorf("final URL leaked the password:\n%s", out)
+	}
+}
+
+func TestRunInsecureWarnsLoudly(t *testing.T) {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer ts.Close()
+
+	code, _, errOut := exec("-insecure", ts.URL)
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr=%q", code, errOut)
+	}
+	if !strings.Contains(errOut, "warning") || !strings.Contains(errOut, "certificate verification") {
+		t.Errorf("expected a TLS warning on stderr, got %q", errOut)
+	}
+}
+
+func TestRunSecureRequestIsQuiet(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer ts.Close()
+
+	code, _, errOut := exec(ts.URL)
+	if code != 0 || errOut != "" {
+		t.Errorf("exit = %d, stderr = %q, want a clean run", code, errOut)
+	}
+}
+
+func TestRunRejectsNegativeTimeout(t *testing.T) {
+	// http.Client reads any non-positive Timeout as "no timeout", so a negative
+	// value must be refused rather than silently removing the bound.
+	code, _, errOut := exec("-timeout", "-1s", "http://192.0.2.1/")
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if !strings.Contains(errOut, "must not be negative") {
+		t.Errorf("stderr = %q", errOut)
+	}
+}
+
+func TestRunSendsHostHeader(t *testing.T) {
+	var gotHost string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHost = r.Host
+	}))
+	defer ts.Close()
+
+	code, _, errOut := exec("-H", "Host: virtual.example", ts.URL)
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr=%q", code, errOut)
+	}
+	if gotHost != "virtual.example" {
+		t.Errorf("server saw Host %q, want virtual.example", gotHost)
+	}
+}
+
+func TestRunReportsHTTP2(t *testing.T) {
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	ts.EnableHTTP2 = true
+	ts.StartTLS()
+	defer ts.Close()
+
+	code, out, errOut := exec("-json", "-insecure", ts.URL)
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr=%q", code, errOut)
+	}
+	var got struct {
+		Proto string `json:"proto"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	// A hand-built Transport with a TLSClientConfig gets no HTTP/2 unless
+	// ForceAttemptHTTP2 is set, which would misreport this as HTTP/1.1.
+	if got.Proto != "HTTP/2.0" {
+		t.Errorf("proto = %q, want HTTP/2.0", got.Proto)
+	}
+}
+
 func TestRunMissingURL(t *testing.T) {
 	code, _, _ := exec()
 	if code != 2 {

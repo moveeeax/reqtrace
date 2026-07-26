@@ -21,6 +21,18 @@ func NewClientTrace(r *Recorder) *httptrace.ClientTrace {
 			r.Mark(EventConnectStart)
 		},
 		ConnectDone: func(network, addr string, err error) {
+			// Dual-stack hosts can fire ConnectStart/ConnectDone more than once:
+			// Go dials each resolved address in turn (or races them) until one
+			// succeeds, so an unreachable address attempted first completes with
+			// an error before the address that is actually used. Recorder.Mark
+			// keeps only the first instant it sees per event, so marking on a
+			// failed attempt here would pin EventConnectDone to that doomed
+			// attempt and understate (or otherwise misreport) TCPConnect for the
+			// connection the request actually ends up using. Only the attempt
+			// that succeeds should complete the phase.
+			if err != nil {
+				return
+			}
 			r.Mark(EventConnectDone)
 		},
 		TLSHandshakeStart: func() {

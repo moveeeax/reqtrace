@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -62,5 +63,37 @@ func TestNewRecorderNilClockDefaults(t *testing.T) {
 	r.Mark(EventStart)
 	if !r.Has(EventStart) {
 		t.Fatal("expected default clock to stamp event")
+	}
+}
+
+// TestRecorderMarkConcurrentSafe exercises the exact pattern a dual-stack
+// dial produces: net.Dialer races an IPv4 and an IPv6 attempt in separate
+// goroutines, so httptrace's ConnectStart/ConnectDone callbacks can land on
+// the same Recorder concurrently. Before Recorder held a mutex, this pattern
+// was an unsynchronized map write, which Go's runtime treats as a fatal,
+// unrecoverable error (not just flagged by -race). Run with -race to prove
+// there is no data race left either.
+func TestRecorderMarkConcurrentSafe(t *testing.T) {
+	r := NewRecorder(SystemClock())
+
+	var wg sync.WaitGroup
+	events := []Event{EventConnectStart, EventConnectDone, EventDNSStart, EventDNSDone}
+	for i := 0; i < 50; i++ {
+		for _, e := range events {
+			wg.Add(1)
+			go func(e Event) {
+				defer wg.Done()
+				r.Mark(e)
+				r.Has(e)
+				r.Time(e)
+			}(e)
+		}
+	}
+	wg.Wait()
+
+	for _, e := range events {
+		if !r.Has(e) {
+			t.Errorf("expected %q to be recorded after concurrent Mark calls", e)
+		}
 	}
 }

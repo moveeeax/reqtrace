@@ -1,7 +1,7 @@
 package httpx
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -33,7 +33,7 @@ func TestParseBodyFromFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "payload.json")
 	want := []byte("payload-from-file")
-	if err := ioutil.WriteFile(path, want, 0o600); err != nil {
+	if err := os.WriteFile(path, want, 0o600); err != nil {
 		t.Fatalf("write temp: %v", err)
 	}
 

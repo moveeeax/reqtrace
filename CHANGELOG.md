@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-02
+
 ### Security
 
 - A password in a `https://user:pass@host` URL is masked in text and JSON
@@ -36,5 +38,6 @@ All notable changes to this project are documented here. The format follows
 
 First release.
 
-[Unreleased]: https://github.com/moveeeax/reqtrace/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/moveeeax/reqtrace/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/moveeeax/reqtrace/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/moveeeax/reqtrace/releases/tag/v0.1.0

@@ -3,6 +3,7 @@ package httpx
 import (
 	"crypto/tls"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -152,5 +153,23 @@ func TestNewClientSecureByDefault(t *testing.T) {
 	tr := c.Transport.(*http.Transport)
 	if tr.TLSClientConfig.InsecureSkipVerify {
 		t.Error("expected certificate verification by default")
+	}
+}
+
+func TestNewClientCustomProxy(t *testing.T) {
+	want, _ := url.Parse("http://proxy.internal:3128")
+	c := NewClient(ClientOptions{Proxy: http.ProxyURL(want)})
+	got, err := c.Transport.(*http.Transport).Proxy(mustReq(t, "https://example.com/"))
+	if err != nil || got.String() != want.String() {
+		t.Errorf("proxy = %v (err %v), want %v", got, err, want)
+	}
+}
+
+func TestNewClientSessionCache(t *testing.T) {
+	if NewClient(ClientOptions{}).Transport.(*http.Transport).TLSClientConfig.ClientSessionCache != nil {
+		t.Error("session cache must be off by default so every probe does a full handshake")
+	}
+	if NewClient(ClientOptions{SessionCache: true}).Transport.(*http.Transport).TLSClientConfig.ClientSessionCache == nil {
+		t.Error("SessionCache: true must install a TLS client session cache")
 	}
 }

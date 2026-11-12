@@ -38,8 +38,16 @@ func NewClientTrace(r *Recorder) *httptrace.ClientTrace {
 		TLSHandshakeStart: func() {
 			r.Mark(EventTLSStart)
 		},
-		TLSHandshakeDone: func(tls.ConnectionState, error) {
+		TLSHandshakeDone: func(state tls.ConnectionState, err error) {
 			r.Mark(EventTLSDone)
+			if err == nil && state.DidResume {
+				r.Mark(EventTLSResumed)
+			}
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			if info.Reused {
+				r.Mark(EventConnReused)
+			}
 		},
 		GotFirstResponseByte: func() {
 			r.Mark(EventFirstByte)

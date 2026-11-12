@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `-n`, `-interval` and `-reuse` repeat a request and print min, p50, p95
+  and max per phase; JSON output gains a `stats` object.
+- `-explain-proxy` explains which proxy setting applies to a URL, entry by
+  entry through `NO_PROXY`, and flags entries that can never match.
+- `-env-file` reads the proxy variables from a `KEY=VALUE` file instead of
+  the environment, for both `-explain-proxy` and real requests.
+- Text and JSON reports name the proxy the request went through
+  (`"proxy": null` for a direct connection).
+
+### Changed
+
+- The module now depends on `golang.org/x/net` for `http/httpproxy` and
+  `idna`, the code net/http itself vendors for proxy selection.
+
 ## [0.1.1] - 2026-11-02
 
 ### Security

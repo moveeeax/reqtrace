@@ -118,3 +118,29 @@ func TestClientTraceAllConnectAttemptsFail(t *testing.T) {
 		t.Error("a failed connect attempt must not record EventConnectDone")
 	}
 }
+
+func TestClientTraceMarksReuseAndResumption(t *testing.T) {
+	r := NewRecorder(SystemClock())
+	ct := NewClientTrace(r)
+
+	ct.GotConn(httptrace.GotConnInfo{Reused: false})
+	ct.TLSHandshakeDone(tls.ConnectionState{DidResume: false}, nil)
+	if r.Has(EventConnReused) || r.Has(EventTLSResumed) {
+		t.Fatal("a fresh connection with a full handshake must not be marked reused or resumed")
+	}
+
+	ct.GotConn(httptrace.GotConnInfo{Reused: true})
+	ct.TLSHandshakeDone(tls.ConnectionState{DidResume: true}, nil)
+	got := Summarize(r)
+	if !got.Reused || !got.TLSResumed {
+		t.Errorf("Reused = %v, TLSResumed = %v, want both true", got.Reused, got.TLSResumed)
+	}
+}
+
+func TestClientTraceFailedHandshakeIsNotResumed(t *testing.T) {
+	r := NewRecorder(SystemClock())
+	NewClientTrace(r).TLSHandshakeDone(tls.ConnectionState{DidResume: true}, errors.New("bad record MAC"))
+	if r.Has(EventTLSResumed) {
+		t.Error("a failed handshake must not count as a resumption")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -26,6 +27,15 @@ type ClientOptions struct {
 	Timeout        time.Duration
 	Insecure       bool
 	FollowRedirect bool
+
+	// Proxy picks the proxy for each request. Nil means
+	// http.ProxyFromEnvironment.
+	Proxy func(*http.Request) (*url.URL, error)
+
+	// SessionCache enables TLS session resumption: a new connection to a
+	// host this client already completed a handshake with resumes that
+	// session instead of running a full handshake.
+	SessionCache bool
 }
 
 // NewClient builds an *http.Client honouring the timeout, TLS verification, and
@@ -37,13 +47,21 @@ type ClientOptions struct {
 // TLSClientConfig has automatic HTTP/2 upgrades disabled outright, which would
 // make every HTTPS probe misreport its protocol as HTTP/1.1.
 func NewClient(opts ClientOptions) *http.Client {
+	proxy := opts.Proxy
+	if proxy == nil {
+		proxy = http.ProxyFromEnvironment
+	}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: opts.Insecure,
+		MinVersion:         tls.VersionTLS12,
+	}
+	if opts.SessionCache {
+		tlsConfig.ClientSessionCache = tls.NewLRUClientSessionCache(0)
+	}
 	transport := &http.Transport{
-		Proxy:             http.ProxyFromEnvironment,
+		Proxy:             proxy,
 		ForceAttemptHTTP2: true,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: opts.Insecure,
-			MinVersion:         tls.VersionTLS12,
-		},
+		TLSClientConfig:   tlsConfig,
 	}
 	client := &http.Client{
 		Timeout:   opts.Timeout,

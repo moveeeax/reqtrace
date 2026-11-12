@@ -14,6 +14,12 @@ type Result struct {
 	// HadTLS reports whether a TLS handshake was observed, letting callers
 	// distinguish a genuinely zero-length handshake from a plain HTTP request.
 	HadTLS bool
+
+	// Reused reports that the request ran on a kept-alive connection, so
+	// there was no DNS lookup, connect or handshake to time.
+	Reused bool
+	// TLSResumed reports that the TLS handshake resumed an earlier session.
+	TLSResumed bool
 }
 
 // span returns the duration between two events when both were recorded.
@@ -46,6 +52,9 @@ func Summarize(r *Recorder) Result {
 	if d, ok := span(r, EventStart, EventDone); ok {
 		res.Total = d
 	}
+
+	res.Reused = r.Has(EventConnReused)
+	res.TLSResumed = r.Has(EventTLSResumed)
 
 	return res
 }

@@ -18,6 +18,11 @@ const (
 	EventTLSDone      Event = "tls_done"
 	EventFirstByte    Event = "first_byte"
 	EventDone         Event = "done"
+
+	// EventConnReused marks a request served on a kept-alive connection.
+	EventConnReused Event = "conn_reused"
+	// EventTLSResumed marks a TLS handshake that resumed an earlier session.
+	EventTLSResumed Event = "tls_resumed"
 )
 
 // Recorder captures the instant at which each lifecycle Event occurs.
